@@ -1,0 +1,51 @@
+# Import necessary libraries
+from flask import Flask, request, jsonify
+import numpy as np
+from PIL import Image
+import tensorflow as tf
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input, decode_predictions
+from tensorflow.keras.preprocessing import image
+
+# Initialize Flask application
+app = Flask(__name__)
+
+# Load pre-trained MobileNetV2 model
+model = MobileNetV2(weights='imagenet')
+
+# Function to preprocess image for model prediction
+def preprocess_image(image_path):
+    img = image.load_img(image_path, target_size=(224, 224))
+    img_array = image.img_to_array(img)
+    img_array = np.expand_dims(img_array, axis=0)
+    img_array = preprocess_input(img_array)
+    return img_array
+
+# Function to predict disease from image
+def predict_disease(image_path):
+    img_array = preprocess_image(image_path)
+    preds = model.predict(img_array)
+    label = decode_predictions(preds, top=1)[0][0][1]
+    return label
+
+# Route for handling image uploads and predicting disease
+@app.route('/predict', methods=['POST'])
+def predict():
+    if request.method == 'POST':
+        # Check if an image file is uploaded
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file part'})
+        file = request.files['file']
+        # Check if the file is an image
+        if file.filename == '':
+            return jsonify({'error': 'No image selected for uploading'})
+        if file:
+            # Save the uploaded image
+            file_path = 'uploads/' + file.filename
+            file.save(file_path)
+            # Predict disease
+            prediction = predict_disease(file_path)
+            return jsonify({'prediction': prediction})
+
+if __name__ == '__main__':
+    app.run(debug=True)
